@@ -10,8 +10,9 @@ cohort, invite, delete, retain, and safely export their launch data.
 
 ## Deploy on Railway
 
-The public Railway template will provision one `web` service and official
-Railway PostgreSQL. Deployment is zero-input: Railway generates
+[Deploy Chirp Waitlist](https://railway.com/deploy/chirp-waitlist) with the
+public zero-input template. It provisions one `web` service and official
+Railway PostgreSQL. Railway generates
 `CHIRP_SECRET_KEY` and `WAITLIST_ADMIN_TOKEN`, then wires the private
 `${{Postgres.DATABASE_URL}}` reference automatically.
 

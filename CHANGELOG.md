@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2 — 2026-07-15
+
+- Record the published Railway template, canonical demo, and latest successful
+  clean-deployment smoke in source collateral.
+
 ## 0.1.1 — 2026-07-15
 
 - Make new-signup, owner-update, deletion, and retention confirmation portable
