@@ -302,7 +302,7 @@ def create_app(
         email, email_normalized = normalized
         safe_referral = referral if _REFERRAL_RE.fullmatch(referral) else ""
         signup_id = uuid4().hex
-        changed = await application.db.execute(
+        await application.db.execute(
             "INSERT INTO signups "
             "(id, email, email_normalized, name, source, referral_code, referred_by, cohort, "
             "invite_state, created_at) VALUES (?, ?, ?, ?, ?, ?, "
@@ -317,7 +317,10 @@ def create_app(
             safe_referral,
             _now(),
         )
-        if changed:
+        stored_id = await application.db.fetch_val(
+            "SELECT id FROM signups WHERE email_normalized = ?", email_normalized
+        )
+        if stored_id == signup_id:
             get_session()["waitlist_signup_id"] = signup_id
         return await join_result(
             "You are on the list. We will share launch updates here.", referral=referral
@@ -349,13 +352,16 @@ def create_app(
             )
         if invite_state not in _INVITE_STATES:
             return await owner_result("Choose a supported invite state.")
-        changed = await application.db.execute(
+        exists = await application.db.fetch_val("SELECT 1 FROM signups WHERE id = ?", signup_id)
+        if exists is None:
+            return await owner_result("Signup not found.")
+        await application.db.execute(
             "UPDATE signups SET cohort = ?, invite_state = ? WHERE id = ?",
             cohort,
             invite_state,
             signup_id,
         )
-        return await owner_result("Signup updated." if changed else "Signup not found.")
+        return await owner_result("Signup updated.")
 
     @application.route(
         "/admin/signups/{signup_id}/delete", methods=["POST"], name="admin.signups.delete"
@@ -363,11 +369,14 @@ def create_app(
     async def delete_signup(signup_id: str) -> MutationResult:
         if not is_admin():
             return await owner_result("Unlock the launch desk before deleting signups.")
+        exists = await application.db.fetch_val("SELECT 1 FROM signups WHERE id = ?", signup_id)
+        if exists is None:
+            return await owner_result("Signup not found.")
         await application.db.execute(
             "UPDATE signups SET referred_by = NULL WHERE referred_by = ?", signup_id
         )
-        changed = await application.db.execute("DELETE FROM signups WHERE id = ?", signup_id)
-        return await owner_result("Signup deleted." if changed else "Signup not found.")
+        await application.db.execute("DELETE FROM signups WHERE id = ?", signup_id)
+        return await owner_result("Signup deleted.")
 
     @application.route("/admin/settings", methods=["POST"], name="admin.settings")
     async def update_settings(request: Request) -> MutationResult:
@@ -413,13 +422,15 @@ def create_app(
         cutoff = (datetime.now(UTC) - timedelta(days=current.retention_days)).isoformat(
             timespec="seconds"
         )
+        before = int(await application.db.fetch_val("SELECT COUNT(*) FROM signups") or 0)
         await application.db.execute(
             "UPDATE signups SET referred_by = NULL WHERE referred_by IN "
             "(SELECT id FROM signups WHERE created_at < ?)",
             cutoff,
         )
-        changed = await application.db.execute("DELETE FROM signups WHERE created_at < ?", cutoff)
-        return await owner_result(f"Retention applied; {changed} signup(s) deleted.")
+        await application.db.execute("DELETE FROM signups WHERE created_at < ?", cutoff)
+        after = int(await application.db.fetch_val("SELECT COUNT(*) FROM signups") or 0)
+        return await owner_result(f"Retention applied; {before - after} signup(s) deleted.")
 
     @application.route("/admin/export.csv", name="admin.export")
     async def export_csv() -> Response:

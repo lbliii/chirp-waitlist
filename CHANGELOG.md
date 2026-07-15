@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 — 2026-07-15
+
+- Make new-signup, owner-update, deletion, and retention confirmation portable
+  across database drivers that do not return affected-row counts.
+- Verify the inserted signup identity before issuing its browser-held referral
+  pass, preserving enumeration resistance under duplicate and concurrent intake.
+
 ## 0.1.0 — 2026-07-15
 
 - Ship a branded public waitlist with plain and HTMX signup paths, live

@@ -194,6 +194,49 @@ async def test_duplicates_are_enumeration_resistant_and_do_not_rewrite_attributi
     assert await application.db.fetch_val("SELECT referred_by FROM signups") is None
 
 
+async def test_driver_without_rowcounts_still_confirms_insert_update_and_delete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    application = _application(tmp_path / "rowcounts.db")
+    async with TestClient(application) as client:
+        original_execute = type(application.db).execute
+
+        async def execute_without_rowcount(database, *args):
+            await original_execute(database, *args)
+            return 0
+
+        monkeypatch.setattr(type(application.db), "execute", execute_without_rowcount)
+        joined, _ = await _join(client, "portable@example.com")
+        assert "Personal referral link" in joined.text
+        csrf_token, cookie = await _login(client)
+        signup_id = await application.db.fetch_val(
+            "SELECT id FROM signups WHERE email_normalized = ?", "portable@example.com"
+        )
+        updated = await client.post(
+            f"/admin/signups/{signup_id}",
+            body=urlencode(
+                {
+                    "cohort": "Portable",
+                    "invite_state": "invited",
+                    "_csrf_token": csrf_token,
+                }
+            ).encode(),
+            headers=_admin_headers(cookie),
+        )
+        page = await client.get("/", headers={"Cookie": cookie})
+        match = _CSRF_RE.search(page.text)
+        assert match is not None
+        deleted = await client.post(
+            f"/admin/signups/{signup_id}/delete",
+            body=urlencode({"_csrf_token": match.group(1)}).encode(),
+            headers=_admin_headers(cookie),
+        )
+
+    assert "Signup updated" in updated.text
+    assert "Signup deleted" in deleted.text
+    assert await application.db.fetch_val("SELECT COUNT(*) FROM signups") == 0
+
+
 async def test_referrals_are_direct_bounded_and_self_loop_rewrites_are_ignored(
     tmp_path: Path,
 ) -> None:
