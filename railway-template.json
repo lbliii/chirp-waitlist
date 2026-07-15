@@ -1,0 +1,79 @@
+{
+  "$schema": "https://raw.githubusercontent.com/lbliii/chirp-railway-catalog/main/schema/template-manifest.schema.json",
+  "schema_version": 1,
+  "template": {
+    "slug": "chirp-waitlist",
+    "title": "Referral Waitlist & Launch Desk — Chirp + PostgreSQL",
+    "repository": "https://github.com/lbliii/chirp-waitlist",
+    "ref": "v0.1.0",
+    "python": "3.14",
+    "chirp_spec": ">=0.10,<0.11",
+    "chirp_locked": "0.10.2",
+    "start_command": "python app.py",
+    "health_path": "/ready",
+    "owner": "lbliii",
+    "support_url": "https://github.com/lbliii/chirp-waitlist/issues",
+    "status": "draft",
+    "public_url": null,
+    "demo_url": null,
+    "last_successful_smoke": null,
+    "services": ["web", "postgres"],
+    "variables": [
+      {"name": "PORT", "source": "railway", "secret": false},
+      {"name": "DATABASE_URL", "source": "railway", "secret": true},
+      {"name": "CHIRP_ENV", "source": "template", "secret": false},
+      {"name": "CHIRP_SECRET_KEY", "source": "template", "secret": true},
+      {"name": "WAITLIST_ADMIN_TOKEN", "source": "template", "secret": true},
+      {"name": "RAILWAY_PUBLIC_DOMAIN", "source": "railway", "secret": false},
+      {"name": "CHIRP_SKIP_MIGRATIONS", "source": "template", "secret": false}
+    ]
+  },
+  "required_categories": ["asset", "form", "full-page", "health", "htmx", "oob", "readiness"],
+  "required_operations": ["deployment", "ejection", "restart", "rollback", "shutdown", "update"],
+  "checks": [
+    {
+      "id": "full-page",
+      "category": "full-page",
+      "path": "/",
+      "contains": ["Chirp Waitlist", "Join us before launch day", "Owner-controlled data", "Zero-input deploy"],
+      "extract": {"csrf": "name=\"_csrf_token\" value=\"([^\"]+)\""}
+    },
+    {
+      "id": "invalid-owner-token",
+      "category": "form",
+      "method": "POST",
+      "path": "/admin/login",
+      "request_headers": {"Content-Type": "application/x-www-form-urlencoded", "HX-Request": "true", "HX-Target": "owner-dashboard"},
+      "body": "token=not-the-owner&_csrf_token={{csrf}}",
+      "contains": ["owner token was not accepted", "hx-swap-oob"]
+    },
+    {
+      "id": "invalid-signup",
+      "category": "form",
+      "method": "POST",
+      "path": "/join",
+      "request_headers": {"Content-Type": "application/x-www-form-urlencoded", "HX-Request": "true", "HX-Target": "join-panel", "X-Forwarded-For": "192.0.2.10"},
+      "body": "email=not-an-email&_csrf_token={{csrf}}",
+      "contains": ["complete email address", "hx-swap-oob"]
+    },
+    {
+      "id": "htmx-owner",
+      "category": "htmx",
+      "path": "/?q=demo",
+      "request_headers": {"HX-Request": "true", "HX-Target": "owner-dashboard"},
+      "contains": ["id=\"owner-dashboard\"", "id=\"live-stats\"", "Duplicate-safe intake", "hx-swap-oob"]
+    },
+    {
+      "id": "oob-stats",
+      "category": "oob",
+      "path": "/stats",
+      "request_headers": {"HX-Request": "true", "HX-Target": "live-stats"},
+      "contains": ["id=\"live-stats\"", "People waiting", "Referral joins"]
+    },
+    {"id": "asset", "category": "asset", "path": "/styles.css", "headers": {"content-type": "text/css"}, "contains": ["--accent:", "--signal:"]},
+    {"id": "favicon", "category": "asset", "path": "/favicon.svg", "headers": {"content-type": "image/svg+xml"}, "contains": ["Chirp Waitlist launch ticket"]},
+    {"id": "health", "category": "health", "path": "/health"},
+    {"id": "readiness", "category": "readiness", "path": "/ready"},
+    {"id": "readiness-head", "category": "readiness", "method": "HEAD", "path": "/ready"}
+  ]
+}

@@ -1,0 +1,140 @@
+{% block page_root %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A private, referral-aware launch waitlist you can own.">
+  <title>{{ settings.product_name }} · Powered by Chirp Waitlist</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false}'>
+</head>
+<body class="theme-{{ settings.accent }}">
+  <header class="site-header wrap">
+    <a class="brand" href="/" aria-label="{{ settings.product_name }} waitlist home">
+      <span class="ticket-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span>{{ settings.product_name }}</span>
+    </a>
+    <div class="header-meta"><span class="live-dot"></span>Launch list open <a href="https://lbliii.github.io/chirp/">Built with Chirp ↗</a></div>
+  </header>
+
+  <main class="wrap">
+    {% block notice %}<div id="notice" class="notice{% if not notice %} is-empty{% elif error %} is-error{% endif %}" role="status" aria-live="polite">{{ notice }}</div>{% endblock %}
+
+    <section class="launch-grid">
+      <div class="launch-copy">
+        <p class="eyebrow">Private preview · places opening soon</p>
+        <h1>{{ settings.headline }}</h1>
+        <p class="lede">{{ settings.subhead }}</p>
+        <div class="trust-row"><span>No mailing platform</span><span>No tracking pixels</span><span>Owner-controlled data</span></div>
+      </div>
+
+      {% block join_panel %}
+      <section id="join-panel" class="join-panel" aria-labelledby="join-title">
+        <div class="queue-tab"><span>EARLY ACCESS</span><strong>#{{ "{:04d}" | format(stats.total + 1) }}</strong></div>
+        {% if personal_referral %}
+        <div class="referral-pass">
+          <p>Your launch pass is ready</p>
+          <h2 id="join-title">Bring good company.</h2>
+          <label>Personal referral link<input value="{{ public_base }}/?ref={{ personal_referral }}" readonly aria-label="Personal referral link"></label>
+          <small>This link belongs to this browser session. It does not verify email ownership.</small>
+        </div>
+        {% else %}
+        <div class="join-heading"><p>Reserve a place</p><h2 id="join-title">Get the launch note.</h2></div>
+        <form method="post" action="/join" hx-post="/join" hx-target="#join-panel" hx-swap="outerHTML" class="join-form">
+          {{ csrf_field() }}
+          {% if referral %}<input type="hidden" name="ref" value="{{ referral }}">{% endif %}
+          <label>Email address<input type="email" name="email" maxlength="254" autocomplete="email" placeholder="you@example.com" required></label>
+          <label>Name <small>optional</small><input name="name" maxlength="80" autocomplete="name" placeholder="How should we greet you?"></label>
+          <input type="hidden" name="source" value="{% if referral %}referral{% else %}direct{% endif %}">
+          <label class="honeypot" aria-hidden="true">Company<input name="company" tabindex="-1" autocomplete="off"></label>
+          <button class="button primary">Join the waitlist <span>→</span></button>
+        </form>
+        <p class="privacy">{{ settings.privacy_text }}</p>
+        {% endif %}
+      </section>
+      {% endblock %}
+    </section>
+
+    {% block stats %}
+    <section id="live-stats" class="stats" aria-label="Live waitlist activity" hx-get="/stats" hx-trigger="every 15s" hx-swap="outerHTML">
+      <article><span>People waiting</span><strong>{{ stats.total }}</strong><small>One email, one place</small></article>
+      <article><span>Referral joins</span><strong>{{ stats.referred }}</strong><small>Direct attribution only</small></article>
+      <article><span>Invites opened</span><strong>{{ stats.invited }}</strong><small>Controlled by the owner</small></article>
+      <div class="live-rule"><i></i><span>Live aggregate · refreshes every 15 seconds</span></div>
+    </section>
+    {% endblock %}
+
+    {% block owner_panel %}
+    <section id="owner-dashboard" class="owner-dashboard" aria-label="Waitlist owner controls">
+      {% if admin %}
+      <header class="dashboard-heading">
+        <div><p class="eyebrow">Launch control</p><h2>{{ signups | length }} visible signup{% if signups | length != 1 %}s{% endif %}</h2></div>
+        <div class="dashboard-actions"><a class="button secondary" href="/admin/export.csv">Export safe CSV ↓</a><form method="post" action="/admin/logout" hx-post="/admin/logout" hx-target="#owner-dashboard" hx-swap="outerHTML">{{ csrf_field() }}<button class="text-button">Lock desk</button></form></div>
+      </header>
+
+      <div class="control-row">
+        <form method="get" action="/" hx-get="/" hx-target="#owner-dashboard" hx-swap="outerHTML" hx-push-url="true" class="search-form">
+          <label><span class="sr-only">Search signups</span><input type="search" name="q" value="{{ search }}" placeholder="Search email, name, source, cohort…"></label><button>Search</button>
+        </form>
+        <details class="settings-panel">
+          <summary>Brand & retention</summary>
+          <form method="post" action="/admin/settings" hx-post="/admin/settings" hx-target="#owner-dashboard" hx-swap="outerHTML">
+            {{ csrf_field() }}
+            <label>Product name<input name="product_name" maxlength="50" value="{{ settings.product_name }}" required></label>
+            <label>Headline<input name="headline" maxlength="100" value="{{ settings.headline }}" required></label>
+            <label class="wide">Launch copy<textarea name="subhead" maxlength="240" required>{{ settings.subhead }}</textarea></label>
+            <label class="wide">Privacy text<textarea name="privacy_text" maxlength="300" required>{{ settings.privacy_text }}</textarea></label>
+            <label>Accent<select name="accent"><option value="coral"{% if settings.accent == "coral" %} selected{% endif %}>Coral</option><option value="lime"{% if settings.accent == "lime" %} selected{% endif %}>Lime</option><option value="blue"{% if settings.accent == "blue" %} selected{% endif %}>Blue</option></select></label>
+            <label>Retention days<input type="number" name="retention_days" min="7" max="3650" value="{{ settings.retention_days }}" required></label>
+            <button class="button primary">Save settings</button>
+          </form>
+          <form method="post" action="/admin/purge" hx-post="/admin/purge" hx-target="#owner-dashboard" hx-swap="outerHTML" class="purge-form">{{ csrf_field() }}<button class="text-button danger">Apply retention now</button></form>
+        </details>
+      </div>
+
+      {% if signups %}
+      <div class="signup-list">
+        {% for signup in signups %}
+        <article class="signup-card">
+          <div class="signup-identity"><span class="state state-{{ signup.invite_state }}"></span><div><strong>{{ signup.email }}</strong><small>{{ signup.name or "No name supplied" }} · {{ signup.created_at[:10] }}</small></div></div>
+          <div class="signup-meta"><span>Source <strong>{{ signup.source }}</strong></span><span>Referrals <strong>{{ signup.direct_referrals }}</strong></span><code>{{ signup.referral_code }}</code></div>
+          <form method="post" action="/admin/signups/{{ signup.id }}" hx-post="/admin/signups/{{ signup.id }}" hx-target="#owner-dashboard" hx-swap="outerHTML" class="signup-controls">
+            {{ csrf_field() }}
+            <label>Cohort<input name="cohort" maxlength="40" value="{{ signup.cohort }}" placeholder="Founding 25"></label>
+            <label>Invite state<select name="invite_state"><option value="waiting"{% if signup.invite_state == "waiting" %} selected{% endif %}>Waiting</option><option value="invited"{% if signup.invite_state == "invited" %} selected{% endif %}>Invited</option><option value="joined"{% if signup.invite_state == "joined" %} selected{% endif %}>Joined</option></select></label>
+            <button class="button compact">Save</button>
+          </form>
+          <form method="post" action="/admin/signups/{{ signup.id }}/delete" hx-post="/admin/signups/{{ signup.id }}/delete" hx-target="#owner-dashboard" hx-swap="outerHTML" class="delete-form">{{ csrf_field() }}<button class="text-button danger">Delete</button></form>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state"><span>01</span><h3>No signups in this view</h3><p>Share the public page or clear the current search. The first response will land here.</p></div>
+      {% endif %}
+      {% else %}
+      <details class="owner-lock">
+        <summary><span><strong>Owner launch desk</strong><small>Search, cohort, invite, export, and delete</small></span><span>LOCKED ↘</span></summary>
+        <form method="post" action="/admin/login" hx-post="/admin/login" hx-target="#owner-dashboard" hx-swap="outerHTML">
+          {{ csrf_field() }}
+          <label>Generated owner token<input type="password" name="token" autocomplete="current-password" required></label>
+          <button class="button primary">Unlock launch desk</button>
+        </form>
+      </details>
+      <div class="owner-preview">
+        <div><span>01</span><strong>Duplicate-safe intake</strong><p>Repeat submissions receive the same response without exposing list membership.</p></div>
+        <div><span>02</span><strong>Bounded referrals</strong><p>One direct referrer, no self-attribution rewrites, and no tracking pixels.</p></div>
+        <div><span>03</span><strong>Portable launch data</strong><p>Search, cohorts, invite states, deletion, retention, and formula-safe CSV.</p></div>
+      </div>
+      {% endif %}
+    </section>
+    {% endblock %}
+
+    <section class="safety-note"><span aria-hidden="true">✣</span><div><strong>A waitlist, not a marketing stack.</strong><p>No outbound email, CRM sync, accounts, billing, or arbitrary tracking. PostgreSQL stores only the launch data this page needs.</p></div></section>
+  </main>
+
+  <footer class="wrap"><span>Chirp Waitlist</span><p>One web service. One database. Zero-input deploy.</p><a href="https://github.com/lbliii/chirp-waitlist">Source & support ↗</a></footer>
+</body>
+</html>
+{% endblock %}

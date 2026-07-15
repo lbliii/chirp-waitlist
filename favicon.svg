@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img">
+  <title>Chirp Waitlist launch ticket</title>
+  <rect width="64" height="64" rx="14" fill="#172320"/>
+  <path d="M13 18h38v10a6 6 0 0 0 0 12v10H13V40a6 6 0 0 0 0-12V18Z" fill="#f6f1df"/>
+  <path d="M23 25h18M23 32h14M23 39h9" stroke="#f15d45" stroke-width="4" stroke-linecap="round"/>
+  <path d="M44 20v28" stroke="#b7d531" stroke-width="2" stroke-dasharray="3 4"/>
+</svg>
